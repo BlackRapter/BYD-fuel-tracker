@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>บันทึกค่าเชื้อเพลิง BYD Sealion 6 DM-i (Google Sheets)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+        .byd-app {
+            font-family: 'Sarabun', sans-serif;
+        }
+    </style>
+</head>
+<body class="byd-app bg-slate-900 text-slate-100 min-h-screen pb-12">
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/80 z-50 flex flex-col items-center justify-center hidden">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-3"></div>
+        <p class="text-sm text-slate-300 font-medium" id="loadingText">
+            กำลังเชื่อมต่อ Google Sheets...
+        </p>
+    </div>
+
+    <!-- Navigation Bar -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-lg">
+                    <i data-lucide="car" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white leading-tight">BYD Sealion 6 DM-i</h1>
+                    <p class="text-xs text-slate-400">
+                        ระบบบันทึกผ่าน Google Sheets (ข้อมูลตรงกันทุกเครื่อง)
+                    </p>
+                </div>
+            </div>
+            <button onclick="initDefaultData()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-md border border-slate-600 flex items-center gap-1 transition">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                โหลดข้อมูลตั้งต้นเข้า Sheets
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 mt-6 space-y-6">
+
+        <!-- Selector Zone -->
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-wrap gap-4 items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i data-lucide="calendar" class="w-5 h-5 text-blue-400"></i>
+                <span class="font-semibold text-slate-200">เลือกรอบบิลสรุปผล:</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <select id="filterYear" onchange="renderApp()" class="bg-slate-900 border border-slate-600 text-slate-200 text-sm rounded-lg p-2.5">
+                    <option value="2569" selected>ปี 2569</option>
+                    <option value="2568">ปี 2568</option>
+                </select>
+                <select id="filterMonth" onchange="renderApp()" class="bg-slate-900 border border-slate-600 text-slate-200 text-sm rounded-lg p-2.5">
+                    <option value="ALL">ทุกเดือน (รวมทั้งปี)</option>
+                    <option value="1">มกราคม</option>
+                    <option value="2">กุมภาพันธ์</option>
+                    <option value="3">มีนาคม</option>
+                    <option value="4">เมษายน</option>
+                    <option value="5">พฤษภาคม</option>
+                    <option value="6">มิถุนายน</option>
+                    <option value="7">กรกฎาคม</option>
+                    <option value="8">สิงหาคม</option>
+                    <option value="9">กันยายน</option>
+                    <option value="10">ตุลาคม</option>
+                    <option value="11">พฤศจิกายน</option>
+                    <option value="12">ธันวาคม</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Dashboard Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-slate-800/80 border border-emerald-500/30 p-4 rounded-xl">
+                <p class="text-xs text-emerald-400 font-medium">
+                    รวมชาร์จบ้าน
+                </p>
+                <h3 id="cardHomeSum" class="text-2xl font-bold text-emerald-300 mt-1">0.00 บาท</h3>
+            </div>
+            <div class="bg-slate-800/80 border border-blue-500/30 p-4 rounded-xl">
+                <p class="text-xs text-blue-400 font-medium">
+                    รวมชาร์จตู้
+                </p>
+                <h3 id="cardStationSum" class="text-2xl font-bold text-blue-300 mt-1">0.00 บาท</h3>
+            </div>
+            <div class="bg-slate-800/80 border border-amber-500/30 p-4 rounded-xl">
+                <p class="text-xs text-amber-400 font-medium">
+                    รวมน้ำมัน
+                </p>
+                <h3 id="cardFuelSum" class="text-2xl font-bold text-amber-300 mt-1">0.00 บาท</h3>
+            </div>
+            <div class="bg-slate-800 border border-violet-500/40 p-4 rounded-xl">
+                <p class="text-xs text-violet-400 font-medium">
+                    รวมทั้งหมด
+                </p>
+                <h3 id="cardTotalSum" class="text-2xl font-bold text-violet-200 mt-1">0.00 บาท</h3>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Form Input -->
+            <div class="lg:col-span-1 bg-slate-800 p-5 rounded-xl border border-slate-700 h-fit space-y-4">
+                <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-700 pb-3">
+                    <i data-lucide="plus-circle" class="w-5 h-5 text-blue-400"></i> เพิ่มรายการใหม่
+                </h2>
+
+                <form id="entryForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">วันที่รายการ</label>
+                        <input type="date" id="inputDate" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">ประเภทรายการ</label>
+                        <select id="inputCategory" onchange="toggleCategoryFields()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100">
+                            <option value="station">ชาร์จตู้ (Public Station)</option>
+                            <option value="home">ชาร์จบ้าน (Home Charge)</option>
+                            <option value="fuel">ค่าน้ำมัน (Fuel)</option>
+                        </select>
+                    </div>
+
+                    <div id="fieldStation" class="space-y-3">
+                        <input type="text" id="stationProvider" placeholder="ชื่อผู้ให้บริการ เช่น EZ Station" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-100">
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="number" step="0.001" id="stationKwh" oninput="calcStationCost()" placeholder="หน่วย (kWh)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-100">
+                            <input type="number" step="0.01" id="stationRate" oninput="calcStationCost()" placeholder="บาท/หน่วย" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-100">
+                        </div>
+                    </div>
+
+                    <div id="fieldHome" class="space-y-3 hidden">
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="number" step="0.1" id="homeKw" value="1.9" oninput="calcHomeCost()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-100">
+                            <input type="number" step="0.001" id="homeRate" value="4.455" oninput="calcHomeCost()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-100">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="number" id="homeHours" min="0" value="3" oninput="calcHomeCost()" placeholder="ชม." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-100">
+                            <input type="number" id="homeMins" min="0" max="59" value="0" oninput="calcHomeCost()" placeholder="นาที" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-100">
+                        </div>
+                    </div>
+
+                    <div id="fieldFuel" class="space-y-3 hidden">
+                        <input type="text" id="fuelNote" placeholder="ปั๊มน้ำมัน / หมายเหตุ" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-100">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-amber-400 mb-1">จำนวนเงินสุทธิ (บาท)</label>
+                        <input type="number" step="0.01" id="inputAmount" required placeholder="0.00" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg p-2.5 text-base font-bold text-amber-300">
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition">
+                        บันทึกรายการ
+                    </button>
+                </form>
+            </div>
+
+            <!-- History Table -->
+            <div class="lg:col-span-2 bg-slate-800 p-5 rounded-xl border border-slate-700">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                    <h2 class="text-base font-bold text-white">ประวัติการบันทึกรายการ</h2>
+                    <span id="recordCount" class="text-xs bg-slate-700 text-slate-300 px-2.5 py-1 rounded-full">0 รายการ</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-900 text-slate-400 text-xs uppercase border-b border-slate-700">
+                            <tr>
+                                <th class="py-3 px-3">วันที่</th>
+                                <th class="py-3 px-3">ประเภท</th>
+                                <th class="py-3 px-3">รายละเอียด</th>
+                                <th class="py-3 px-3 text-right">จำนวนเงิน</th>
+                                <th class="py-3 px-3 text-center">ลบ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-slate-700/60"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ✅ เชื่อมต่อกับ Web App URL ของคุณเรียบร้อยแล้ว
+        const API_URL = "https://script.google.com/macros/s/AKfycbw9-b1ZJ4LF5Z3_LmGQzOpG6gLip7zRb782Uy_MDsef_vvy7Kv3UYxXIGH53ecje0juuw/exec";
+
+        let records = [];
+
+        const initialRecords = [{
+            id: "1",
+            date: "2025-04-30",
+            category: "home",
+            title: "ชาร์จบ้าน 1.8kW (4ชม.30นาที)",
+            amount: 36.09
+        },
+            {
+                id: "2",
+                date: "2025-05-09",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 12.4 kWh @7.50",
+                amount: 93.00
+            },
+            {
+                id: "3",
+                date: "2025-05-17",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 10.7 kWh @6.60",
+                amount: 70.62
+            },
+            {
+                id: "4",
+                date: "2025-05-18",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (1ชม.30นาที)",
+                amount: 12.70
+            },
+            {
+                id: "5",
+                date: "2025-05-20",
+                category: "home",
+                title: "ชาร์จบ้าน 1.8kW (3ชม.45นาที)",
+                amount: 30.07
+            },
+            {
+                id: "6",
+                date: "2025-05-20",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 500.00
+            },
+            {
+                id: "7",
+                date: "2025-05-27",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (5ชม.23นาที)",
+                amount: 45.57
+            },
+            {
+                id: "8",
+                date: "2025-06-01",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 8.10 kWh @7.50",
+                amount: 60.75
+            },
+            {
+                id: "9",
+                date: "2025-06-03",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 14.80 kWh @7.50",
+                amount: 111.00
+            },
+            {
+                id: "10",
+                date: "2025-06-05",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (2ชม.16นาที)",
+                amount: 19.05
+            },
+            {
+                id: "11",
+                date: "2025-06-06",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 15.30 kWh @7.90",
+                amount: 120.87
+            },
+            {
+                id: "12",
+                date: "2025-06-07",
+                category: "station",
+                title: "ชาร์จตู้ EA Anywhere 11.18 kWh @8.90",
+                amount: 100.00
+            },
+            {
+                id: "13",
+                date: "2025-06-08",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 14.70 kWh @6.60",
+                amount: 97.02
+            },
+            {
+                id: "14",
+                date: "2025-06-12",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.41นาที)",
+                amount: 31.17
+            },
+            {
+                id: "15",
+                date: "2025-06-20",
+                category: "home",
+                title: "ชาร์จบ้าน 1.8kW (4ชม.19นาที)",
+                amount: 34.62
+            },
+            {
+                id: "16",
+                date: "2025-06-20",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 500.00
+            },
+            {
+                id: "17",
+                date: "2025-06-27",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (4ชม.2นาที)",
+                amount: 33.86
+            },
+            {
+                id: "18",
+                date: "2025-07-01",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 8.70 kWh @7.50",
+                amount: 65.25
+            },
+            {
+                id: "19",
+                date: "2025-07-09",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 9.70 kWh @7.50",
+                amount: 72.75
+            },
+            {
+                id: "20",
+                date: "2025-07-12",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 8.51 kWh @6.60",
+                amount: 56.17
+            },
+            {
+                id: "21",
+                date: "2025-07-20",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.40 kWh @6.60",
+                amount: 62.04
+            },
+            {
+                id: "22",
+                date: "2025-07-27",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.027 kWh @6.60",
+                amount: 72.78
+            },
+            {
+                id: "23",
+                date: "2025-08-02",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (5ชม.57นาที)",
+                amount: 50.79
+            },
+            {
+                id: "24",
+                date: "2025-08-11",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 12.17 kWh @7.90",
+                amount: 76.14
+            },
+            {
+                id: "25",
+                date: "2025-08-17",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 8.40 kWh @7.50",
+                amount: 63.00
+            },
+            {
+                id: "26",
+                date: "2025-08-23",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.063 kWh @6.60",
+                amount: 59.82
+            },
+            {
+                id: "27",
+                date: "2025-08-26",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 5.10 kWh @7.50",
+                amount: 38.25
+            },
+            {
+                id: "28",
+                date: "2025-08-29",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.781 kWh @7.90",
+                amount: 76.77
+            },
+            {
+                id: "29",
+                date: "2025-08-31",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.188 kWh @6.60",
+                amount: 60.64
+            },
+            {
+                id: "30",
+                date: "2025-09-06",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.59นาที)",
+                amount: 33.86
+            },
+            {
+                id: "31",
+                date: "2025-09-13",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.40 kWh @6.60",
+                amount: 62.04
+            },
+            {
+                id: "32",
+                date: "2025-09-13",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 500.00
+            },
+            {
+                id: "33",
+                date: "2025-09-21",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 10.30 kWh @6.60",
+                amount: 67.98
+            },
+            {
+                id: "34",
+                date: "2025-09-27",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.784 kWh @6.60",
+                amount: 64.57
+            },
+            {
+                id: "35",
+                date: "2025-10-03",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 9.30 kWh @7.50",
+                amount: 60.75
+            },
+            {
+                id: "36",
+                date: "2025-10-05",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.10 kWh @6.60",
+                amount: 73.26
+            },
+            {
+                id: "37",
+                date: "2025-10-12",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 8.321 kWh @6.60",
+                amount: 54.92
+            },
+            {
+                id: "38",
+                date: "2025-10-18",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 10.80 kWh @7.50",
+                amount: 81.00
+            },
+            {
+                id: "39",
+                date: "2025-10-18",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 500.00
+            },
+            {
+                id: "40",
+                date: "2025-10-25",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.344 kWh @6.60",
+                amount: 61.67
+            },
+            {
+                id: "41",
+                date: "2025-11-01",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.103 kWh @6.60",
+                amount: 60.08
+            },
+            {
+                id: "42",
+                date: "2025-11-07",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 10.30 kWh @7.50",
+                amount: 77.25
+            },
+            {
+                id: "43",
+                date: "2025-11-09",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.117 kWh @6.60",
+                amount: 73.37
+            },
+            {
+                id: "44",
+                date: "2025-11-16",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 10.53 kWh @6.60",
+                amount: 69.50
+            },
+            {
+                id: "45",
+                date: "2025-11-22",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 7.497 kWh @6.60",
+                amount: 49.48
+            },
+            {
+                id: "46",
+                date: "2025-11-29",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.875 kWh @6.60",
+                amount: 78.38
+            },
+            {
+                id: "47",
+                date: "2025-12-07",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.920 kWh @6.60",
+                amount: 78.67
+            },
+            {
+                id: "48",
+                date: "2025-12-11",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.15นาที)",
+                amount: 27.51
+            },
+            {
+                id: "49",
+                date: "2025-12-12",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 14.70 kWh @7.90",
+                amount: 116.13
+            },
+            {
+                id: "50",
+                date: "2025-12-14",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 15.00 kWh @6.60",
+                amount: 99.00
+            },
+            {
+                id: "51",
+                date: "2025-12-15",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 15.40 kWh @7.50",
+                amount: 115.50
+            },
+            {
+                id: "52",
+                date: "2025-12-20",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.207 kWh @6.60",
+                amount: 60.77
+            },
+            {
+                id: "53",
+                date: "2025-12-20",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 500.00
+            },
+            {
+                id: "54",
+                date: "2025-12-28",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.264 kWh @6.60",
+                amount: 74.34
+            },
+            {
+                id: "55",
+                date: "2025-12-30",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.22นาที)",
+                amount: 28.53
+            },
+            {
+                id: "56",
+                date: "2025-12-31",
+                category: "station",
+                title: "ชาร์จตู้ EA Anywhere 13.48 kWh (เหมา)",
+                amount: 150.00
+            },
+            {
+                id: "57",
+                date: "2026-01-02",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 15.662 kWh @7.90",
+                amount: 123.73
+            },
+            {
+                id: "58",
+                date: "2026-01-04",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 7.063 kWh @6.60",
+                amount: 46.62
+            },
+            {
+                id: "59",
+                date: "2026-01-11",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 10.655 kWh @6.60",
+                amount: 70.32
+            },
+            {
+                id: "60",
+                date: "2026-01-18",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.500 kWh @6.60",
+                amount: 75.90
+            },
+            {
+                id: "61",
+                date: "2026-01-18",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 600.00
+            },
+            {
+                id: "62",
+                date: "2026-01-25",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 10.70 kWh @7.50",
+                amount: 80.25
+            },
+            {
+                id: "63",
+                date: "2026-02-01",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.921 kWh @6.60",
+                amount: 78.68
+            },
+            {
+                id: "64",
+                date: "2026-02-08",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.470 kWh @6.60",
+                amount: 75.70
+            },
+            {
+                id: "65",
+                date: "2026-02-15",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 8.90 kWh @7.50",
+                amount: 66.75
+            },
+            {
+                id: "66",
+                date: "2026-02-22",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.398 kWh @6.60",
+                amount: 75.23
+            },
+            {
+                id: "67",
+                date: "2026-02-28",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 13.205 kWh @6.60",
+                amount: 87.15
+            },
+            {
+                id: "68",
+                date: "2026-03-01",
+                category: "station",
+                title: "ชาร์จตู้ MEA EV 14.894 kWh @7.50",
+                amount: 111.71
+            },
+            {
+                id: "69",
+                date: "2026-03-03",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 15.30 kWh @7.50",
+                amount: 114.75
+            },
+            {
+                id: "70",
+                date: "2026-03-06",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.4นาที)",
+                amount: 25.39
+            },
+            {
+                id: "71",
+                date: "2026-03-08",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 16.00 kWh @7.50",
+                amount: 120.00
+            },
+            {
+                id: "72",
+                date: "2026-03-15",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 8.30 kWh @7.50",
+                amount: 62.25
+            },
+            {
+                id: "73",
+                date: "2026-03-15",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 1150.00
+            },
+            {
+                id: "74",
+                date: "2026-03-22",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.067 kWh @6.60",
+                amount: 73.04
+            },
+            {
+                id: "75",
+                date: "2026-03-29",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.370 kWh @6.60",
+                amount: 75.04
+            },
+            {
+                id: "76",
+                date: "2026-04-05",
+                category: "station",
+                title: "ชาร์จตู้ EA Anywhere 12.57 kWh (เหมา 2ชม.)",
+                amount: 150.00
+            },
+            {
+                id: "77",
+                date: "2026-04-08",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 6.102 kWh @7.90",
+                amount: 48.21
+            },
+            {
+                id: "78",
+                date: "2026-04-15",
+                category: "station",
+                title: "ชาร์จตู้ Altervim (เหมา AC 1ชม.)",
+                amount: 60.00
+            },
+            {
+                id: "79",
+                date: "2026-04-15",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 11.50 kWh @7.50",
+                amount: 86.25
+            },
+            {
+                id: "80",
+                date: "2026-04-16",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (7ชม.50นาที)",
+                amount: 66.28
+            },
+            {
+                id: "81",
+                date: "2026-04-18",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 17.045 kWh @6.60",
+                amount: 112.50
+            },
+            {
+                id: "82",
+                date: "2026-04-22",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 6.459 kWh @6.60",
+                amount: 51.03
+            },
+            {
+                id: "83",
+                date: "2026-04-23",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.7นาที)",
+                amount: 26.38
+            },
+            {
+                id: "84",
+                date: "2026-04-25",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 10.74 kWh @6.60",
+                amount: 70.88
+            },
+            {
+                id: "85",
+                date: "2026-04-26",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 10.723 kWh @6.60",
+                amount: 70.77
+            },
+            {
+                id: "86",
+                date: "2026-05-03",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 13.634 kWh @6.60",
+                amount: 89.98
+            },
+            {
+                id: "87",
+                date: "2026-05-06",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 5.326 kWh @7.90",
+                amount: 42.08
+            },
+            {
+                id: "88",
+                date: "2026-05-10",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.503 kWh @6.60",
+                amount: 62.72
+            },
+            {
+                id: "89",
+                date: "2026-05-15",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 8.80 kWh @7.50",
+                amount: 66.00
+            },
+            {
+                id: "90",
+                date: "2026-05-24",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 12.874 kWh @6.60",
+                amount: 84.97
+            },
+            {
+                id: "91",
+                date: "2026-05-27",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (4ชม.11นาที)",
+                amount: 35.42
+            },
+            {
+                id: "92",
+                date: "2026-05-30",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 15.60 kWh @7.50",
+                amount: 117.00
+            },
+            {
+                id: "93",
+                date: "2026-06-03",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 4.368 kWh @6.60",
+                amount: 28.83
+            },
+            {
+                id: "94",
+                date: "2026-06-07",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 10.70 kWh @7.50",
+                amount: 80.25
+            },
+            {
+                id: "95",
+                date: "2026-06-14",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 10.899 kWh @6.60",
+                amount: 71.93
+            },
+            {
+                id: "96",
+                date: "2026-06-21",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 10.60 kWh @7.50",
+                amount: 79.50
+            },
+            {
+                id: "97",
+                date: "2026-06-28",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 12.656 kWh @6.60",
+                amount: 83.53
+            },
+            {
+                id: "98",
+                date: "2026-07-03",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 12.656 kWh @7.90",
+                amount: 46.80
+            },
+            {
+                id: "99",
+                date: "2026-07-05",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 8.900 kWh @6.60",
+                amount: 58.74
+            },
+            {
+                id: "100",
+                date: "2026-07-09",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 7.075 kWh @7.90",
+                amount: 55.89
+            },
+            {
+                id: "101",
+                date: "2026-07-12",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 7.60 kWh @7.50",
+                amount: 57.00
+            },
+            {
+                id: "102",
+                date: "2026-07-19",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 10.10 kWh @7.50",
+                amount: 75.75
+            },
+            {
+                id: "103",
+                date: "2026-07-22",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (4ชม.30นาที)",
+                amount: 38.09
+            },
+            {
+                id: "104",
+                date: "2026-07-25",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 14.260 kWh @6.60",
+                amount: 94.12
+            },
+            {
+                id: "105",
+                date: "2026-08-02",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 12.528 kWh @6.60",
+                amount: 82.68
+            },
+            {
+                id: "106",
+                date: "2026-08-09",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 6.10 kWh @7.50",
+                amount: 45.75
+            },
+            {
+                id: "107",
+                date: "2026-08-16",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.507 kWh @6.60",
+                amount: 75.95
+            },
+            {
+                id: "108",
+                date: "2026-08-19",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.16นาที)",
+                amount: 27.65
+            },
+            {
+                id: "109",
+                date: "2026-08-20",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (4ชม.21นาที)",
+                amount: 36.82
+            },
+            {
+                id: "110",
+                date: "2026-08-20",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 600.00
+            },
+            {
+                id: "111",
+                date: "2026-08-23",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 13.10 kWh @7.50",
+                amount: 98.25
+            },
+            {
+                id: "112",
+                date: "2026-08-26",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.3นาที)",
+                amount: 25.82
+            },
+            {
+                id: "113",
+                date: "2026-08-29",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 12.00 kWh @7.50",
+                amount: 90.00
+            },
+            {
+                id: "114",
+                date: "2026-09-03",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 6.752 kWh @7.40 (On-Peak)",
+                amount: 49.96
+            },
+            {
+                id: "115",
+                date: "2026-09-06",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 14.468 kWh @6.10",
+                amount: 88.25
+            },
+            {
+                id: "116",
+                date: "2026-09-13",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 11.418 kWh @6.10",
+                amount: 69.65
+            },
+            {
+                id: "117",
+                date: "2026-09-15",
+                category: "station",
+                title: "ชาร์จตู้ EA Anywhere 5.56 kWh (1ชม.)",
+                amount: 80.00
+            },
+            {
+                id: "118",
+                date: "2026-09-16",
+                category: "home",
+                title: "ชาร์จบ้าน 1.9kW (3ชม.3นาที)",
+                amount: 25.82
+            },
+            {
+                id: "119",
+                date: "2026-09-19",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 14.845 kWh @6.10",
+                amount: 90.55
+            },
+            {
+                id: "120",
+                date: "2026-09-19",
+                category: "fuel",
+                title: "ค่าน้ำมัน",
+                amount: 1087.00
+            },
+            {
+                id: "121",
+                date: "2026-09-27",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station (ตู้รวน)",
+                amount: 1.76
+            },
+            {
+                id: "122",
+                date: "2026-10-04",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 11.40 kWh @7.50",
+                amount: 85.50
+            },
+            {
+                id: "123",
+                date: "2026-10-11",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 11.80 kWh @7.50",
+                amount: 88.50
+            },
+            {
+                id: "124",
+                date: "2026-10-17",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 10.700 kWh @6.10",
+                amount: 65.27
+            },
+            {
+                id: "125",
+                date: "2026-10-25",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 9.30 kWh @7.50",
+                amount: 69.75
+            },
+            {
+                id: "126",
+                date: "2026-11-01",
+                category: "station",
+                title: "ชาร์จตู้ Altervim 7.60 kWh @7.50",
+                amount: 57.00
+            },
+            {
+                id: "127",
+                date: "2026-11-05",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 5.300 kWh @7.40 (On-Peak)",
+                amount: 39.22
+            },
+            {
+                id: "128",
+                date: "2026-11-08",
+                category: "station",
+                title: "ชาร์จตู้ EZ Station 9.420 kWh @6.10",
+                amount: 57.46
+            }];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('inputDate').valueAsDate = new Date();
+            fetchRecords();
+        });
+
+        function showLoading(text) {
+            document.getElementById('loadingText').innerText = text;
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+
+        async function fetchRecords() {
+            showLoading("กำลังโหลดข้อมูลจาก Google Sheets...");
+            try {
+                let response = await fetch(API_URL);
+                let data = await response.json();
+                records = data;
+                renderApp();
+            } catch (error) {
+                alert("ไม่สามารถโหลดข้อมูลได้ กรุณาตรวจสอบการเชื่อมต่อ");
+                console.error(error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function initDefaultData() {
+            if (confirm('คุณต้องการโหลดข้อมูลตั้งต้นทั้งหมดเข้า Google Sheets ใช่หรือไม่?')) {
+                showLoading("กำลังบันทึกข้อมูลตั้งต้น...");
+                try {
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'init', records: initialRecords
+                        })
+                    });
+                    await fetchRecords();
+                } catch (error) {
+                    alert("เกิดข้อผิดพลาดในการโหลดข้อมูลตั้งต้น");
+                } finally {
+                    hideLoading();
+                }
+            }
+        }
+
+        function toggleCategoryFields() {
+            const cat = document.getElementById('inputCategory').value;
+            document.getElementById('fieldStation').classList.toggle('hidden', cat !== 'station');
+            document.getElementById('fieldHome').classList.toggle('hidden', cat !== 'home');
+            document.getElementById('fieldFuel').classList.toggle('hidden', cat !== 'fuel');
+            document.getElementById('inputAmount').value = '';
+        }
+
+        function calcStationCost() {
+            const kwh = parseFloat(document.getElementById('stationKwh').value) || 0;
+            const rate = parseFloat(document.getElementById('stationRate').value) || 0;
+            if (kwh > 0 && rate > 0) document.getElementById('inputAmount').value = (kwh * rate).toFixed(2);
+        }
+
+        function calcHomeCost() {
+            const kw = parseFloat(document.getElementById('homeKw').value) || 0;
+            const rate = parseFloat(document.getElementById('homeRate').value) || 0;
+            const hrs = parseFloat(document.getElementById('homeHours').value) || 0;
+            const mins = parseFloat(document.getElementById('homeMins').value) || 0;
+            const totalHours = hrs + (mins / 60);
+            if (kw > 0 && rate > 0 && totalHours > 0) document.getElementById('inputAmount').value = (kw * totalHours * rate).toFixed(2);
+        }
+
+        async function handleFormSubmit(e) {
+    e.preventDefault();
+    const dateStr = document.getElementById('inputDate').value;
+    const category = document.getElementById('inputCategory').value;
+    const amount = parseFloat(document.getElementById('inputAmount').value) || 0;
+
+    let title = '';
+    if (category === 'station') {
+        const provider = document.getElementById('stationProvider').value || 'ตู้ชาร์จทั่วไป';
+        const kwh = document.getElementById('stationKwh').value;
+        const rate = document.getElementById('stationRate').value;
+        
+        // ประกอบรายละเอียด: ชื่อตู้ + จำนวน kWh + ราคาต่อหน่วย
+        let details = [];
+        if (kwh) details.push(`${kwh} kWh`);
+        if (rate) details.push(`@${rate}`);
+        
+        title = `ชาร์จตู้ ${provider} ${details.join(' ')}`.trim();
+    } else if (category === 'home') {
+        const kw = document.getElementById('homeKw').value;
+        const hrs = document.getElementById('homeHours').value;
+        const mins = document.getElementById('homeMins').value;
+        title = `ชาร์จบ้าน ${kw}kW (${hrs}ชม.${mins}นาที)`;
+    } else {
+        const note = document.getElementById('fuelNote').value;
+        title = `ค่าน้ำมัน ${note ? '(' + note + ')' : ''}`;
+    }
+
+    const newRecord = {
+        id: Date.now().toString(),
+        date: dateStr,
+        category,
+        title,
+        amount
+    };
+
+    showLoading("กำลังบันทึกข้อมูลลง Google Sheets...");
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'add', record: newRecord })
+        });
+        document.getElementById('entryForm').reset();
+        document.getElementById('inputDate').valueAsDate = new Date();
+        toggleCategoryFields();
+        await fetchRecords();
+    } catch (error) {
+        alert("บันทึกไม่สำเร็จ");
+        hideLoading();
+    }
+}
+
+
+        async function deleteRecord(id) {
+            if (confirm('คุณต้องการลบรายการนี้ใช่หรือไม่?')) {
+                showLoading("กำลังลบรายการ...");
+                try {
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'delete', id: id
+                        })
+                    });
+                    await fetchRecords();
+                } catch (error) {
+                    alert("ลบไม่สำเร็จ");
+                    hideLoading();
+                }
+            }
+        }
+
+        function renderApp() {
+            const filterYearBE = document.getElementById('filterYear').value;
+            const filterYearAD = (parseInt(filterYearBE) - 543).toString();
+            const filterMonth = document.getElementById('filterMonth').value;
+
+            const filteredRecords = records.filter(r => {
+                if (!r.date) return false;
+                const parts = r.date.split('-');
+                if (parts.length < 3) return false;
+                const rYear = parts[0];
+                const rMonth = parseInt(parts[1]).toString();
+
+                return (rYear === filterYearAD) && (filterMonth === 'ALL' || rMonth === filterMonth);
+            });
+
+            filteredRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            let homeSum = 0, stationSum = 0, fuelSum = 0;
+            filteredRecords.forEach(r => {
+                if (r.category === 'home') homeSum += r.amount;
+                else if (r.category === 'station') stationSum += r.amount;
+                else if (r.category === 'fuel') fuelSum += r.amount;
+            });
+            const totalSum = homeSum + stationSum + fuelSum;
+
+            document.getElementById('cardHomeSum').innerText = homeSum.toLocaleString('th-TH',
+                {
+                    minimumFractionDigits: 2
+                }) + ' บาท';
+            document.getElementById('cardStationSum').innerText = stationSum.toLocaleString('th-TH',
+                {
+                    minimumFractionDigits: 2
+                }) + ' บาท';
+            document.getElementById('cardFuelSum').innerText = fuelSum.toLocaleString('th-TH',
+                {
+                    minimumFractionDigits: 2
+                }) + ' บาท';
+            document.getElementById('cardTotalSum').innerText = totalSum.toLocaleString('th-TH',
+                {
+                    minimumFractionDigits: 2
+                }) + ' บาท';
+
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+            document.getElementById('recordCount').innerText = `${filteredRecords.length} รายการ`;
+
+            if (filteredRecords.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500">ไม่พบรายการบันทึก</td></tr>`;
+            } else {
+                filteredRecords.forEach(r => {
+                    const parts = r.date.split('-');
+                    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                    const thaiDate = `${d.getDate()} ${['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][d.getMonth()]} ${d.getFullYear() + 543}`;
+
+                    let catBadge = r.category === 'home' ? '<span class="text-emerald-400">ชาร์จบ้าน</span>': r.category === 'station' ? '<span class="text-blue-400">ชาร์จตู้</span>': '<span class="text-amber-400">น้ำมัน</span>';
+
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-slate-700/40 transition-colors';
+                    row.innerHTML = `
+                    <td class="py-3 px-3 text-xs text-slate-400">${thaiDate}</td>
+                    <td class="py-3 px-3">${catBadge}</td>
+                    <td class="py-3 px-3 font-medium text-slate-200">${r.title}</td>
+                    <td class="py-3 px-3 text-right font-semibold text-slate-100">${Number(r.amount).toLocaleString('th-TH', {
+                        minimumFractionDigits: 2
+                    })}</td>
+                    <td class="py-3 px-3 text-center">
+                    <button onclick="deleteRecord('${r.id}')" class="text-slate-400 hover:text-red-400">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                    </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
