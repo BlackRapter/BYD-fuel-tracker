@@ -7,9 +7,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
-        .byd-app { font-family: 'Sarabun', sans-serif; }
-    </style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+    .byd-app { font-family: 'Sarabun', sans-serif; }
+
+    /* 🟢 เพิ่มส่วนนี้เข้าไป เพื่อให้ช่องวันที่บนคอมพิวเตอร์คลิกง่ายและแสดงปฏิทินชัดเจนขึ้น */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        background: transparent;
+        cursor: pointer;
+        padding: 5px;
+        filter: invert(1); /* ทำให้ไอคอนปฏิทินเป็นสีสว่าง มองเห็นชัดเจนบนพื้นมืด */
+        width: 24px;
+        height: 24px;
+    }
+</style>
 </head>
 <body class="byd-app bg-slate-900 text-slate-100 min-h-screen pb-12">
 
